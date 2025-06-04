@@ -54,26 +54,26 @@ class MVBenchDataset:
 
     def __init__(self):
         self.data_list_config = {
-        "Action Sequence": ("action_sequence.json", "star/Charades_v1_480", "video", True),
-        "Action Prediction": ("action_prediction.json", "star/Charades_v1_480", "video", True),
-        "Action Antonym": ("action_antonym.json", "ssv2_video", "video", False),
-        "Fine-grained Action": ("fine_grained_action.json", "Moments_in_Time_Raw/videos", "video", False),
-        "Unexpected Action": ("unexpected_action.json", "FunQA_test/test", "video", False),
-        "Object Existence": ("object_existence.json", "clevrer/video_validation", "video", False),
-        "Object Interaction": ("object_interaction.json", "star/Charades_v1_480", "video", True),
-        "Object Shuffle": ("object_shuffle.json", "perception/videos", "video", False),
-        "Moving Direction": ("moving_direction.json", "clevrer/video_validation", "video", False),
-        "Action Localization": ("action_localization.json", "sta/sta_video", "video", True),
-        "Scene Transition": ("scene_transition.json", "scene_qa/video", "video", False),
-        "Action Count": ("action_count.json", "perception/videos", "video", False),
-        "Moving Count": ("moving_count.json", "clevrer/video_validation", "video", False),
-        "Moving Attribute": ("moving_attribute.json", "clevrer/video_validation", "video", False),
-        "State Change": ("state_change.json", "perception/videos", "video", False),
+        # "Action Sequence": ("action_sequence.json", "star/Charades_v1_480", "video", True),
+        # "Action Prediction": ("action_prediction.json", "star/Charades_v1_480", "video", True),
+        # "Action Antonym": ("action_antonym.json", "ssv2_video", "video", False),
+        # "Fine-grained Action": ("fine_grained_action.json", "Moments_in_Time_Raw/videos", "video", False),
+        # "Unexpected Action": ("unexpected_action.json", "FunQA_test/test", "video", False),
+        # "Object Existence": ("object_existence.json", "clevrer/video_validation", "video", False),
+        # "Object Interaction": ("object_interaction.json", "star/Charades_v1_480", "video", True),
+        # "Object Shuffle": ("object_shuffle.json", "perception/videos", "video", False),
+        # "Moving Direction": ("moving_direction.json", "clevrer/video_validation", "video", False),
+        # "Action Localization": ("action_localization.json", "sta/sta_video", "video", True),
+        # "Scene Transition": ("scene_transition.json", "scene_qa/video", "video", False),
+        # "Action Count": ("action_count.json", "perception/videos", "video", False),
+        # "Moving Count": ("moving_count.json", "clevrer/video_validation", "video", False),
+        # "Moving Attribute": ("moving_attribute.json", "clevrer/video_validation", "video", False),
+        # "State Change": ("state_change.json", "perception/videos", "video", False),
         # "Fine-grained Pose": ("fine_grained_pose.json", "nturgbd", "video", False),
-        "Character Order": ("character_order.json", "perception/videos", "video", False),
-        "Egocentric Navigation": ("egocentric_navigation.json", "vlnqa", "video", False),
-        # "Episodic Reasoning": ("episodic_reasoning.json", "tvqa/frames_fps3_hq", "frame", True),
-        "Counterfactual Inference": ("counterfactual_inference.json", "clevrer/video_validation", "video", False),
+        # "Character Order": ("character_order.json", "perception/videos", "video", False),
+        # "Egocentric Navigation": ("egocentric_navigation.json", "vlnqa", "video", False),
+        "Episodic Reasoning": ("episodic_reasoning.json", "tvqa/frames_fps3_hq", "frame", True),
+        # "Counterfactual Inference": ("counterfactual_inference.json", "clevrer/video_validation", "video", False),
         }
 
         pass
@@ -113,10 +113,15 @@ class MVBenchDataset:
             video_path = os.path.join(entry["video_prefix"], entry["data"]["video"])
 
         # Compose QA prompt (with options)
+        subtitle = entry["data"].get("subtitle", "").strip()
+        
+        question_text = ""
+        if subtitle:
+            question_text += f"Subtitle for the Video:\n{subtitle}\n\n"
 
-
-        question_text = f"Question: {entry['data']['question']}\n"
+        question_text += f"Question: {entry['data']['question']}\n"
         question_text += "Options:\n"
+
         answer_text = entry["data"]["answer"]
         answer_idx = -1
 

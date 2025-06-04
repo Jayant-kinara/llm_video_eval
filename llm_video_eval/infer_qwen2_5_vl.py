@@ -44,7 +44,7 @@ class Qwen2_5_VL_Inferer:
 
         self.device = torch.device(device)
 
-    def infer_video(self, video_path, question, max_new_tokens=512, fps=0.5, resized_height=12*28, resized_width=12*28, dynamic=False, dataset=None):
+    def infer_video(self, video_path, question, dataset, max_new_tokens=512, fps=0.5, resized_height=12*28, resized_width=12*28, dynamic=False, ):
         # If dynamic FPS is enabled → auto select fps
         if dynamic:
             try:
@@ -69,6 +69,10 @@ class Qwen2_5_VL_Inferer:
 
         messages = [
             {
+                "role": "system",
+                "content": dataset.SYS
+            },
+            {
                 "role": "user",
                 "content": [
                     {
@@ -80,10 +84,6 @@ class Qwen2_5_VL_Inferer:
                     },
                     {"type": "text", "text": question}
                 ]
-            },
-            {
-                "role": "system",
-                "content": dataset.SYS
             }
         ]
 
@@ -114,7 +114,7 @@ class Qwen2_5_VL_Inferer:
         response = self.processor.batch_decode(output_ids, skip_special_tokens=True)[0]
         return response, duration_sec, fps
 
-    def infer_frames(self, frame_folder, question, max_new_tokens=512, num_frames=8, bound=None, fps=3):
+    def infer_frames(self, frame_folder, question, dataset, max_new_tokens=512, num_frames=32, bound=None, fps=3):
         # All frame files
         frame_files = sorted([
             os.path.join(frame_folder, f)
@@ -149,9 +149,13 @@ class Qwen2_5_VL_Inferer:
 
         frame_uris = [f"file://{f}" for f in selected_frames]
 
-        print(f"[infer_frames] Using frames:\n{frame_uris}")
+        print(f"[infer_frames] Using Num frames:{len(frame_uris)}")
 
         messages = [
+            {
+                "role": "system",
+                "content": dataset.SYS
+            },
             {
                 "role": "user",
                 "content": [
@@ -161,10 +165,6 @@ class Qwen2_5_VL_Inferer:
                     },
                     {"type": "text", "text": question}
                 ]
-            },
-            {
-                "role": "system",
-                "content": "You are an AI assistant that is good at understanding videos."
             }
         ]
 
@@ -191,9 +191,9 @@ class Qwen2_5_VL_Inferer:
                 **model_inputs,
                 max_new_tokens=max_new_tokens
             )
-
         response = self.processor.batch_decode(output_ids, skip_special_tokens=True)[0]
-        return response
+
+        return response, bound[1]-bound[0], fps
 
 
 

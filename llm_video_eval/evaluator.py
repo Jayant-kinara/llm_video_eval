@@ -36,12 +36,21 @@ class VideoEvaluator:
         self.output_path = output_path
         self.dataset = None
 
-    def generate(self, video_path, question, video_type="video"):
+    def generate(self, video_path, question, bound, video_type="video"):
+        response, duration, fps = "", None, None
         if video_type == "video":
             response, duration, fps = self.inferer.infer_video(
                 video_path=video_path,
                 question=question,
                 dynamic=True,
+                dataset=self.dataset
+            )
+        elif video_type == "frame":
+            response, duration, fps = self.inferer.infer_frames(
+                video_path,
+                question=question,
+                num_frames=24,
+                bound=bound,
                 dataset=self.dataset
             )
         else:
@@ -161,7 +170,7 @@ class VideoEvaluator:
                 continue
 
             try:
-                model_response, duration, fps_used = self.generate(item["video_path"], item["question"], video_type=item.get("video_type", "video"))
+                model_response, duration, fps_used = self.generate(item["video_path"], item["question"], bound=item['bound'], video_type=item.get("video_type", "video"))
                 model_response = self.inferer.postprocess_response(model_response)
                 ollama_output, is_correct = self.evaluate_with_ollama(
                     item["question"], model_response, item["answer"], options=item.get("options", None)
