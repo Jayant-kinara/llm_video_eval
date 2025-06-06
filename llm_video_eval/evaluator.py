@@ -29,10 +29,10 @@ DATASET_MAP = {
 SEED = 121222
 
 class VideoEvaluator:
-    def __init__(self, model_path, output_path, rotate):
+    def __init__(self, model_path, output_path, rotate, attn_implementation):
         print(f"Loading model from: {model_path}")
         self.model_path = model_path
-        self.inferer = Qwen2_5_VL_Inferer(model_id=model_path, rotate=rotate)
+        self.inferer = Qwen2_5_VL_Inferer(model_id=model_path, rotate=rotate, attn_implementation=attn_implementation)
         self.output_path = output_path
         self.dataset = None
 
@@ -49,7 +49,7 @@ class VideoEvaluator:
             response, duration, fps = self.inferer.infer_frames(
                 video_path,
                 question=question,
-                num_frames=24,
+                num_frames=8,
                 bound=bound,
                 dataset=self.dataset
             )

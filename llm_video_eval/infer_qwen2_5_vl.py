@@ -21,13 +21,16 @@ def get_video_duration_torchvision(video_path):
     return duration
 
 class Qwen2_5_VL_Inferer:
-    def __init__(self, model_id="Qwen/Qwen2.5-VL-7B-Instruct", device="cuda", rotate=False):
+    def __init__(self, model_id="Qwen/Qwen2.5-VL-7B-Instruct", device="cuda", rotate=False, attn_implementation="sdpa"):
+        print("using attn_implementation: ", attn_implementation)
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model_id,
             device_map="auto",
             torch_dtype=torch.bfloat16,
             trust_remote_code=True,
-            cache_dir="/auto/worka/vpothula/models"
+            cache_dir="/auto/worka/vpothula/models",
+            attn_implementation = attn_implementation
+            # attn_implementation = "sdpa"
         )
 
         if rotate:
@@ -53,13 +56,24 @@ class Qwen2_5_VL_Inferer:
                 print(f"[Fallback] Error with decord on {video_path}, using torchvision: {e}")
                 duration_sec = get_video_duration_torchvision(video_path)
             
-            if duration_sec < 10:
+            # if duration_sec < 10:
+            #     fps = 3.0
+            # elif duration_sec < 20:
+            #     fps = 2.0
+            # elif duration_sec < 60:
+            #     fps = 1.0
+            # elif duration_sec < 120:
+            #     fps = 0.5
+            # else:
+            #     fps = 0.25
+
+            if duration_sec < 5:
                 fps = 3.0
-            elif duration_sec < 20:
+            elif duration_sec < 10:
                 fps = 2.0
-            elif duration_sec < 60:
+            elif duration_sec < 30:
                 fps = 1.0
-            elif duration_sec < 120:
+            elif duration_sec < 60:
                 fps = 0.5
             else:
                 fps = 0.25
