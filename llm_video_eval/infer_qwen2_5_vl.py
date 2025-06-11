@@ -5,6 +5,7 @@ from qwen_vl_utils import process_vision_info
 from rotated.rotation_utils import rotate_llm_model, rotate_visual_model
 import numpy as np
 import torchvision.io as tvio
+from qdq import *
 
 # decord.bridge.set_bridge("torch")
 
@@ -21,7 +22,10 @@ def get_video_duration_torchvision(video_path):
     return duration
 
 class Qwen2_5_VL_Inferer:
-    def __init__(self, model_id="Qwen/Qwen2.5-VL-7B-Instruct", device="cuda", rotate=False, attn_implementation="sdpa"):
+    def __init__(self, model_id="Qwen/Qwen2.5-VL-7B-Instruct", device="cuda",
+                rotate=False, attn_implementation="sdpa",
+                vision_qdq=False, lang_qdq=False,
+                weights_qdq=False,hooks_qdq=False):
         print("using attn_implementation: ", attn_implementation)
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model_id,
@@ -38,6 +42,14 @@ class Qwen2_5_VL_Inferer:
             rotate_visual_model(self.model)
             rotate_llm_model(self.model)
             print("QuaRot DONE")
+            
+        # Apply QDQ logic
+        if vision_qdq:
+            self._apply_vision_qdq(weights_qdq, hooks_qdq)
+        elif lang_qdq:
+            self._apply_lang_qdq(weights_qdq, hooks_qdq)
+        else:
+            print("No QDQ chosen. Use --vision_qdq or --lang_qdq with --weights_qdq and/or --hooks_qdq to enable QDQ.")
 
         self.processor = Qwen2_5_VLProcessor.from_pretrained(
             model_id,
@@ -47,8 +59,29 @@ class Qwen2_5_VL_Inferer:
 
         self.device = torch.device(device)
 
+
+    def _apply_vision_qdq(self, weights_qdq, hooks_qdq):
+        print("Performing Vision QDQ")
+        if weights_qdq:
+            print(" - Applying Vision Weights QDQ")
+            quantize_model_weights_vision(self.model.visual)
+        if hooks_qdq:
+            print(" - Adding Vision Hooks QDQ")
+            self.model.visual, output_hooks, hook_ref = add_output_hooks_visual(self.model.visual, {})
+
+    def _apply_lang_qdq(self, weights_qdq, hooks_qdq):
+        print("Performing Language QDQ")
+        if weights_qdq:
+            print(" - Applying Language Weights QDQ")
+            quantize_model_weights_language(self.model)
+        if hooks_qdq:
+            print(" - Adding Language Hooks QDQ")
+            self.model.language_model, output_hooks, hook_ref = add_output_hooks_language(self.model.language_model, {})
+
     def infer_video(self, video_path, question, dataset, max_new_tokens=512, fps=0.5, resized_height=12*28, resized_width=12*28, dynamic=False, ):
         # If dynamic FPS is enabled → auto select fps
+        print("question")
+        print(question)
         if dynamic:
             try:
                 duration_sec = get_video_duration(video_path)

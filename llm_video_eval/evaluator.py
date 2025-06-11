@@ -5,7 +5,7 @@ import os
 import datetime
 from tqdm import tqdm
 from infer_qwen2_5_vl import Qwen2_5_VL_Inferer
-from dataset import MMBenchVideoDataset, MVBenchDataset
+from dataset import MMBenchVideoDataset, MVBenchDataset, PerceptionTestMCVQADataset
 from eval_utils import print_summary, compute_soft_score, calculate_accuracy
 import ollama
 import gc
@@ -17,22 +17,28 @@ os.environ["OLLAMA_HOST"] = "http://10.10.20.16:11434"
 # Dataset mapping
 # /auto/share/sw/common/data/llm_accuracy_datasets/video_datasets
 DATASET_PATH_MAP = {
-    "MMBench-Video": "/auto/regrt/sw/vpothula/vlmEvalKit_test1/vlm_accuracy_runner/datasets/MMBench-Video",
-    "MVBench": "/auto/regrt/sw/vpothula/vlmEvalKit_test1/vlm_accuracy_runner/datasets/MVBench"
+    "MMBench-Video": "/auto/regrt/sw/vpothula/llm_eval_repo/llm_eval/llm_video_eval/datasets/MMBench-Video",
+    "MVBench": "/auto/regrt/sw/vpothula/llm_eval_repo/llm_eval/llm_video_eval/datasets/MVBench",
+    "PerceptionTest": "/auto/regrt/sw/vpothula/llm_eval_repo/llm_eval/llm_video_eval/datasets/PerceptionTest-MC_VQA"
 }
 
 DATASET_MAP = {
     "MMBench-Video": MMBenchVideoDataset(),
-    "MVBench": MVBenchDataset()
+    "MVBench": MVBenchDataset(),
+    "PerceptionTest": PerceptionTestMCVQADataset()
+
 }
 
 SEED = 121222
 
 class VideoEvaluator:
-    def __init__(self, model_path, output_path, rotate, attn_implementation):
+    def __init__(self, model_path, output_path, rotate, attn_implementation, 
+                vision_qdq=False, lang_qdq=False,
+                weights_qdq=False,hooks_qdq=False):
         print(f"Loading model from: {model_path}")
         self.model_path = model_path
-        self.inferer = Qwen2_5_VL_Inferer(model_id=model_path, rotate=rotate, attn_implementation=attn_implementation)
+        self.inferer = Qwen2_5_VL_Inferer(model_id=model_path, rotate=rotate, attn_implementation=attn_implementation, vision_qdq=vision_qdq,
+        lang_qdq=lang_qdq, weights_qdq=weights_qdq, hooks_qdq=hooks_qdq)
         self.output_path = output_path
         self.dataset = None
 

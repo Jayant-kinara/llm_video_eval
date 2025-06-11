@@ -143,3 +143,56 @@ class MVBenchDataset:
             "bound": (entry["data"]["start"], entry["data"]["end"]) if entry["has_bound"] else None,
             "video_type": entry["data_type"] 
         }
+
+class PerceptionTestMCVQADataset:
+
+    SYS = (
+        "Please watch the video carefully and answer the following multiple choice questions. "
+        "For each question, output only the selected option text exactly as it appears. "
+        "Do not explain your reasoning. If the answer is unknown, output 'I don't know'."
+    )
+
+    def __init__(self):
+        pass
+
+    def init(self, dataset_path):
+        self.dataset_path = dataset_path
+        json_path = os.path.join(dataset_path, "mc_question_valid.json")  # using validation set
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            self.json_data = json.load(f)
+
+        # Flatten into list of QA items
+        self.data_list = []
+        for video_id, entry in self.json_data.items():
+            video_path = os.path.join(dataset_path, "videos", f"{video_id}.mp4")
+
+            for q in entry["mc_question"]:
+                # Compose QA prompt with options
+                answer_id = q["answer_id"]
+                answer_text = q["options"][answer_id]
+                question_text = f"Question: {q['question']}\nOptions:\n"
+                for idx_opt, c in enumerate(q["options"]):
+                    question_text += f"({chr(ord('A') + idx_opt)}) {c}\n"
+                    if c == answer_text:
+                        answer_idx = idx_opt
+
+                # Use correct answer from answer_id
+                formatted_answer = f"({chr(ord('A') + answer_idx)}) {answer_text}"
+
+                self.data_list.append({
+                    "question_id": f"{video_id}_q{q['id']}",
+                    "video_path": video_path,
+                    "question": question_text,
+                    "answer": formatted_answer,
+                    "task_type": "PerceptionTest-MC_VQA",
+                    "options": q["options"],
+                    "video_type": "video",   # it's normal video
+                    "bound": None            # no time bounds
+                })
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def get_item(self, idx):
+        return self.data_list[idx]

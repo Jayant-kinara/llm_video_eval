@@ -6,3 +6,4 @@ category_summary.json
 run_meta.json
 results_output*
 output_*_run*
+datasets/*
