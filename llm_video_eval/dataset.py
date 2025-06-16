@@ -185,7 +185,7 @@ class PerceptionTestMCVQADataset:
                     "video_path": video_path,
                     "question": question_text,
                     "answer": formatted_answer,
-                    "task_type": "PerceptionTest-MC_VQA",
+                    "task_type": q['area'],
                     "options": q["options"],
                     "video_type": "video",   # it's normal video
                     "bound": None            # no time bounds

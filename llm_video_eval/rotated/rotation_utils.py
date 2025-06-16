@@ -173,3 +173,21 @@ def rotate_llm_model(model):
     merge_lnorm_weights(model.lm_head, final_layernorm)
     rotate_left(model.lm_head, hadamard_matrix_llm)
     model.language_model.norm = Qwen2RMSNormNoWeight(llm_hidden_size).to(model.language_model.norm.weight.device)
+
+
+def partially_rotate_visual_model(model):
+    visual_hidden_size = 1280
+    k = 6
+    block_had_size = 20
+    assert(block_had_size * (2**k) == visual_hidden_size)
+    hadamard_matrix_visual: torch.Tensor = sylvester_hadamard_20(k).double().cuda()
+    old_forward = model.visual.patch_embed.forward
+    rotation = torch.nn.Linear(visual_hidden_size, visual_hidden_size, False, model.device, dtype = torch.bfloat16)
+    rotation.load_state_dict({
+        "weight": hadamard_matrix_visual.T.bfloat16()
+    })
+    model.visual.patch_embed.register_module('rotation', rotation)
+    def new_forward(pixels):
+        output = old_forward(pixels)
+        return model.visual.patch_embed.rotation(output)
+    model.visual.patch_embed.forward = new_forward

@@ -2,7 +2,7 @@ import torch, os
 import decord
 from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2_5_VLProcessor
 from qwen_vl_utils import process_vision_info
-from rotated.rotation_utils import rotate_llm_model, rotate_visual_model
+from rotated.rotation_utils import rotate_llm_model, rotate_visual_model, partially_rotate_visual_model
 import numpy as np
 import torchvision.io as tvio
 from qdq import *
@@ -25,7 +25,7 @@ class Qwen2_5_VL_Inferer:
     def __init__(self, model_id="Qwen/Qwen2.5-VL-7B-Instruct", device="cuda",
                 rotate=False, attn_implementation="sdpa",
                 vision_qdq=False, lang_qdq=False,
-                weights_qdq=False,hooks_qdq=False):
+                weights_qdq=False,hooks_qdq=False, partial_rotate=True):
         print("using attn_implementation: ", attn_implementation)
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model_id,
@@ -42,6 +42,10 @@ class Qwen2_5_VL_Inferer:
             rotate_visual_model(self.model)
             rotate_llm_model(self.model)
             print("QuaRot DONE")
+        if partial_rotate:
+            print("Partial Rotate START")
+            partially_rotate_visual_model(self.model)
+            print("Partial Rotate DONE")
             
         # Apply QDQ logic
         if vision_qdq:
@@ -51,8 +55,9 @@ class Qwen2_5_VL_Inferer:
         else:
             print("No QDQ chosen. Use --vision_qdq or --lang_qdq with --weights_qdq and/or --hooks_qdq to enable QDQ.")
 
+        MODEL_ID = "Qwen/Qwen2.5-VL-7B-Instruct"
         self.processor = Qwen2_5_VLProcessor.from_pretrained(
-            model_id,
+            MODEL_ID,
             trust_remote_code=True,
             use_fast=True
         )
