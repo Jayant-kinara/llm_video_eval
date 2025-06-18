@@ -4,6 +4,7 @@ import json
 import os
 import datetime
 from tqdm import tqdm
+from typing import List
 from infer_qwen2_5_vl import Qwen2_5_VL_Inferer
 from dataset import MMBenchVideoDataset, MVBenchDataset, PerceptionTestMCVQADataset
 from eval_utils import print_summary, compute_soft_score, calculate_accuracy
@@ -63,6 +64,17 @@ class VideoEvaluator:
             raise ValueError(f"Unsupported video_type: {video_type}")
 
         return response, duration, fps
+
+    def generate_batch(self,
+                    items: List[dict]):
+        """items is a list of dataset.get_item() dicts, all video_type=='video'."""
+        video_paths  = [it["video_path"] for it in items]
+        questions    = [it["question"]   for it in items]
+        responses, durations, fps_list = self.inferer.infer_video_batch(
+            video_paths, questions, dataset=self.dataset, dynamic=True
+        )
+        return list(zip(responses, durations, fps_list))
+
 
     def evaluate_with_ollama(self, question, model_response, ground_truth, options=None):
         if not options:
@@ -169,6 +181,7 @@ class VideoEvaluator:
             existing_qids = set()
 
         for idx in tqdm(sample_indices):
+            # idx = 1411
             item = self.dataset.get_item(idx)
             qid = item["question_id"]
 

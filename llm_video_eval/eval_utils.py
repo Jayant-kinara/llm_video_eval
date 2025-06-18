@@ -1,4 +1,7 @@
 import evaluate
+import decord 
+import torchvision.io as tvio
+
 
 # Load once — cache
 _bleu = evaluate.load("bleu")
@@ -29,3 +32,16 @@ def print_summary(results):
     accuracy = calculate_accuracy(results)
     print(f"Accuracy: {accuracy*100:.2f}% ({len(results)} examples)")
 
+
+
+def get_video_duration(video_path):
+    vr = decord.VideoReader(video_path)
+    num_frames = len(vr)
+    fps = vr.get_avg_fps()
+    duration = num_frames / fps
+    return duration
+
+def get_video_duration_torchvision(video_path):
+    video, _, info = tvio.read_video(video_path, pts_unit='sec')
+    duration = info['video_duration']
+    return duration

@@ -15,6 +15,10 @@ def main():
     parser.add_argument("--lang_qdq", action="store_true", help="Enable lang_qdq")
     parser.add_argument("--weights_qdq", action="store_true", help="Enable weights_qdq")
     parser.add_argument("--hooks_qdq", action="store_true", help="Enable hooks_qdq")
+    parser.add_argument("--batch_size", type=int, default=1,
+                        help="How many *video* samples to send to the model at once. "
+                            "If a batch contains any frame-directory sample or "
+                            "batch_size==1 we fall back to single-query mode.")
     args = parser.parse_args()
 
     os.makedirs(args.output_path, exist_ok=True)

@@ -2,6 +2,8 @@
 import torch
 import functools
 
+LANG_HOOK_GROUP_SIZE = 64
+
 class Tee:
 	def __init__(self, *files):
 		self.files = files
@@ -137,33 +139,34 @@ class OutputQDQ32_8_Hook_language(object):
 		flag = False
 		group_size = 64
 		axis = -1
+		# print("QDQ LANG HOOK GROUP SIZE :" , LANG_HOOK_GROUP_SIZE)
 
 		qdq_int = qdq(output, int32_scale, 32, True)
 		if "v_out" in name:
 			shape = qdq_int.shape
 			qdq_int = qdq_int.reshape(4,-1, 128)
 			t = qdq_int.shape[1]
-			x = 64 - (t%64)
-			if x == 64:
+			x = LANG_HOOK_GROUP_SIZE - (t%LANG_HOOK_GROUP_SIZE)
+			if x == LANG_HOOK_GROUP_SIZE:
 				x = 0
 			pad = (0,0,0,x)
 			qdq_int = torch.nn.functional.pad(qdq_int, pad, "constant", 0)
-			qdq_int = qdq_group(qdq_int, bits = 8, group_size = 64, offset_enabled = False, is_two_power = True, axis = -2)
+			qdq_int = qdq_group(qdq_int, bits = 8, group_size = LANG_HOOK_GROUP_SIZE, offset_enabled = False, is_two_power = True, axis = -2)
 			qdq_int = qdq_int[:,:t,:]
 			qdq_int = qdq_int.reshape(*shape)
 			output = qdq_int
 		elif "sfmx" in name:
 			t = qdq_int.shape[-1]
-			x = 64 - (t%64)
-			if x == 64:
+			x = LANG_HOOK_GROUP_SIZE - (t%LANG_HOOK_GROUP_SIZE)
+			if x == LANG_HOOK_GROUP_SIZE:
 				x = 0
 			pad = (0,x)
 			qdq_int = torch.nn.functional.pad(qdq_int, pad, "constant", 0)
-			qdq_int = qdq_group(qdq_int, bits = 8, group_size = 64, offset_enabled = False, is_two_power = True, axis = -1, is_unsigned = True)
+			qdq_int = qdq_group(qdq_int, bits = 8, group_size = LANG_HOOK_GROUP_SIZE, offset_enabled = False, is_two_power = True, axis = -1, is_unsigned = True)
 			qdq_int = qdq_int[:,:,:,:t]
 			output = qdq_int
 		else:
-			qdq_int = qdq_group(qdq_int, bits = 8, group_size = 64, offset_enabled = False, is_two_power = True, axis = -1)
+			qdq_int = qdq_group(qdq_int, bits = 8, group_size = LANG_HOOK_GROUP_SIZE, offset_enabled = False, is_two_power = True, axis = -1)
 			# print(f"for module {name}, max diff in qdq is", (output - qdq_int).abs().max())
 			output = qdq_int
 		return output
@@ -277,7 +280,8 @@ def quantize_model_weights_language(model):
 			module.weight = torch.nn.Parameter(qdq_group(module.weight,4, 64, True))
 		elif isinstance(module, torch.nn.Linear) and "visual" not in name:
 			print(f"Quantizing the weight of the Layer: {name}, bits: 4, group_size: 64", module.weight.shape)
-			module.weight = torch.nn.Parameter(qdq_group(module.weight,8, None, False))
+			# module.weight = torch.nn.Parameter(qdq_group(module.weight,8, None, False))
+			module.weight = torch.nn.Parameter(qdq_group(module.weight,4, 64, True))
 			# qdq_group(tensor: torch.Tensor, bits = 8, group_size = None, offset_enabled = False, is_two_power = False, axis = -1):
 
 def quantize_model_weights_vision(model):

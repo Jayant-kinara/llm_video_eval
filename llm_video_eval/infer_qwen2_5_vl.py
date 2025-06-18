@@ -5,8 +5,8 @@ from qwen_vl_utils import process_vision_info
 from rotated.rotation_utils import rotate_llm_model, rotate_visual_model, partially_rotate_visual_model
 import numpy as np
 import torchvision.io as tvio
-from qdq import *
-
+from qdq_util import *
+import qdq_util
 # decord.bridge.set_bridge("torch")
 
 def get_video_duration(video_path):
@@ -30,6 +30,10 @@ class Qwen2_5_VL_Inferer:
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model_id,
             device_map="auto",
+            max_memory={
+                0: "3GB",    # allow only 5 GB of model weights on GPU 0
+                1: "22GB",   # allow up to 30 GB on GPU 1
+            },
             torch_dtype=torch.bfloat16,
             trust_remote_code=True,
             cache_dir="/auto/worka/vpothula/models",
@@ -49,8 +53,18 @@ class Qwen2_5_VL_Inferer:
             
         # Apply QDQ logic
         if vision_qdq:
+
+            # weights_qdq = True
+            # hooks_qdq = True
+
             self._apply_vision_qdq(weights_qdq, hooks_qdq)
-        elif lang_qdq:
+        if lang_qdq:
+
+            # weights_qdq = True
+            # hooks_qdq = True
+            
+            qdq_util.LANG_HOOK_GROUP_SIZE = 32
+            
             self._apply_lang_qdq(weights_qdq, hooks_qdq)
         else:
             print("No QDQ chosen. Use --vision_qdq or --lang_qdq with --weights_qdq and/or --hooks_qdq to enable QDQ.")
