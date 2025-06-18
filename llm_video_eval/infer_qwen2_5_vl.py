@@ -24,8 +24,9 @@ def get_video_duration_torchvision(video_path):
 class Qwen2_5_VL_Inferer:
     def __init__(self, model_id="Qwen/Qwen2.5-VL-7B-Instruct", device="cuda",
                 rotate=False, attn_implementation="sdpa",
-                vision_qdq=False, lang_qdq=False,
-                weights_qdq=False,hooks_qdq=False, partial_rotate=True):
+                weights_vision_qdq=False, hooks_vision_qdq=False,
+                weights_lang_qdq=False,hooks_lang_qdq=False,
+                partial_rotate=True):
         print("using attn_implementation: ", attn_implementation)
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model_id,
@@ -51,21 +52,10 @@ class Qwen2_5_VL_Inferer:
             partially_rotate_visual_model(self.model)
             print("Partial Rotate DONE")
             
-        # Apply QDQ logic
-        if vision_qdq:
-
-            # weights_qdq = True
-            # hooks_qdq = True
-
-            self._apply_vision_qdq(weights_qdq, hooks_qdq)
-        if lang_qdq:
-
-            # weights_qdq = True
-            # hooks_qdq = True
-            
-            qdq_util.LANG_HOOK_GROUP_SIZE = 32
-            
-            self._apply_lang_qdq(weights_qdq, hooks_qdq)
+            # Apply QDQ logic
+            self._apply_vision_qdq(weights_vision_qdq, hooks_vision_qdq)
+            qdq_util.LANG_HOOK_GROUP_SIZE = 32 # configurable
+            self._apply_lang_qdq(weights_lang_qdq, hooks_lang_qdq)
         else:
             print("No QDQ chosen. Use --vision_qdq or --lang_qdq with --weights_qdq and/or --hooks_qdq to enable QDQ.")
 

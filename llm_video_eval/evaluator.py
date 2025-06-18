@@ -34,12 +34,12 @@ SEED = 121222
 
 class VideoEvaluator:
     def __init__(self, model_path, output_path, rotate, attn_implementation, 
-                vision_qdq=False, lang_qdq=False,
-                weights_qdq=False,hooks_qdq=False):
+                weights_vision_qdq=False, hooks_vision_qdq=False,
+                weights_lang_qdq=False,hooks_lang_qdq=False):
         print(f"Loading model from: {model_path}")
         self.model_path = model_path
-        self.inferer = Qwen2_5_VL_Inferer(model_id=model_path, rotate=rotate, attn_implementation=attn_implementation, vision_qdq=vision_qdq,
-        lang_qdq=lang_qdq, weights_qdq=weights_qdq, hooks_qdq=hooks_qdq)
+        self.inferer = Qwen2_5_VL_Inferer(model_id=model_path, rotate=rotate, attn_implementation=attn_implementation, weights_vision_qdq=weights_vision_qdq,
+        hooks_vision_qdq=hooks_vision_qdq, weights_lang_qdq=weights_lang_qdq, hooks_lang_qdq=hooks_lang_qdq)
         self.output_path = output_path
         self.dataset = None
 

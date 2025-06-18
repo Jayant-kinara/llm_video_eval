@@ -11,10 +11,10 @@ def main():
     parser.add_argument("--continue_run", default=None)
     parser.add_argument("--attn_implementation", default="sdpa")
     parser.add_argument("--rotate", action="store_true", help="Enable QuaRot rotation")
-    parser.add_argument("--vision_qdq", action="store_true", help="Enable vision_qdq")
-    parser.add_argument("--lang_qdq", action="store_true", help="Enable lang_qdq")
-    parser.add_argument("--weights_qdq", action="store_true", help="Enable weights_qdq")
-    parser.add_argument("--hooks_qdq", action="store_true", help="Enable hooks_qdq")
+    parser.add_argument("--weights_vision_qdq", action="store_true", help="Enable weights_vision_qdq")
+    parser.add_argument("--hooks_vision_qdq", action="store_true", help="Enable hooks_vision_qdq")
+    parser.add_argument("--weights_lang_qdq", action="store_true", help="Enable weights_lang_qdq")
+    parser.add_argument("--hooks_lang_qdq", action="store_true", help="Enable hooks_lang_qdq")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="How many *video* samples to send to the model at once. "
                             "If a batch contains any frame-directory sample or "
@@ -25,8 +25,8 @@ def main():
 
     evaluator = VideoEvaluator(args.model_path, args.output_path, rotate=args.rotate,
                                attn_implementation=args.attn_implementation,
-                               vision_qdq=args.vision_qdq, lang_qdq=args.lang_qdq,
-                               weights_qdq=args.weights_qdq,hooks_qdq=args.hooks_qdq)
+                               weights_vision_qdq=args.weights_vision_qdq, hooks_vision_qdq=args.hooks_vision_qdq,
+                               weights_lang_qdq=args.weights_lang_qdq,hooks_lang_qdq=args.hooks_lang_qdq)
     evaluator.evaluate(args.dataset, args.samples, continue_run_folder=args.continue_run)
 
 if __name__ == "__main__":
