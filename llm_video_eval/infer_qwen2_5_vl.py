@@ -54,7 +54,7 @@ class Qwen2_5_VL_Inferer:
             
             # Apply QDQ logic
             self._apply_vision_qdq(weights_vision_qdq, hooks_vision_qdq)
-            qdq_util.LANG_HOOK_GROUP_SIZE = 32 # configurable
+            qdq_util.LANG_HOOK_GROUP_SIZE = 64 # configurable
             self._apply_lang_qdq(weights_lang_qdq, hooks_lang_qdq)
         else:
             print("No QDQ chosen. Use --vision_qdq or --lang_qdq with --weights_qdq and/or --hooks_qdq to enable QDQ.")
