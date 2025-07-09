@@ -58,7 +58,7 @@ def qdq(tensor, scale, n_bits = 8, sign = True):
 def round_ste(x: torch.Tensor):
 	return (x.round() - x).detach() + x
 
-def qdq_group(tensor: torch.Tensor, bits = 8, group_size = None, offset_enabled = False, is_two_power = False, axis = -1, is_unsigned = False):
+def qdq_group(tensor: torch.Tensor, bits = 8, group_size = None, offset_enabled = False, is_two_power = False, axis = -1, is_unsigned = False, is_qkt = False):
 	tensor_shape = tensor.shape
 	if group_size is not None:
 		shape = tensor.shape
@@ -74,8 +74,12 @@ def qdq_group(tensor: torch.Tensor, bits = 8, group_size = None, offset_enabled 
 	xmin = tensor.amin(reduce_shape, keepdim=True)
 	xmax =  tensor.amax(reduce_shape, keepdim=True)
 	if is_two_power:
-		if offset_enabled:
-			offset = xmax - 15	
+		if is_qkt:
+			offset = torch.zeros_like(xmax)
+			idx1 = xmax - xmin > 15
+			idx2 =  xmax - xmin <= 15
+			offset[idx1] = xmax[idx1] - 15
+			offset[idx2] = xmin[idx2]	
 			xmax = torch.clamp(xmax.sub(offset),0,15)
 			xmin = torch.clamp(xmin.sub(offset),0,15)
 			tensor = torch.clamp(tensor.sub(offset),0,15)
@@ -87,6 +91,21 @@ def qdq_group(tensor: torch.Tensor, bits = 8, group_size = None, offset_enabled 
 			scale = scale.pow(-1)
 			tensor_int = round_ste(tensor / scale) 
 			tensor_int = torch.clamp(tensor_int,  0, (2**(bits))-1)
+			tensor_dequant = tensor_int.mul(scale)
+
+		elif offset_enabled:
+			diff = xmax - xmin
+			new_max = diff + 1.22443e-15
+			intPart = torch.floor(torch.log2(new_max)) + torch.ones_like(new_max)
+			fracPart = (bits)*torch.ones_like(intPart) - intPart
+			scale = (2**fracPart)
+			scale = scale.pow(-1)
+			scale = scale.clamp(min=1e-6, max=1e6)
+			offset = round_ste(-xmin/scale)
+			tensor_int = round_ste(tensor / scale)
+			tensor_int = tensor_int.add(offset)
+			tensor_int = torch.clamp(tensor_int, 0, (2**(bits))-1)
+			tensor_int = tensor_int.sub(offset)
 			tensor_dequant = tensor_int.mul(scale)
 		else:
 			if is_unsigned:
@@ -139,10 +158,36 @@ class OutputQDQ32_8_Hook_language(object):
 		flag = False
 		group_size = 64
 		axis = -1
+		# uses_offset = True
 		# print("QDQ LANG HOOK GROUP SIZE :" , LANG_HOOK_GROUP_SIZE)
 
+		if "smooth_k" in name:
+			output = output - output.mean(2).reshape(1,4,1,128)
+			# return output
+
 		qdq_int = qdq(output, int32_scale, 32, True)
-		if "v_out" in name:
+		# output = qdq_int
+		# if "down_proj" not in name and "o_proj" not in name and "residue" not in name and "norm" not in name:
+		# 	output = qdq_int
+		# if "q_out" in name:
+		# 	output = qdq_int
+		if "residue" in name or "norm" in name or "embed_tokens" in name or "k_out" in name:
+			qdq_int = qdq_group(qdq_int, bits = 16, group_size = 64, offset_enabled = False, is_two_power = True, axis = -1)
+			output = qdq_int
+		# if "down_proj" not in name and "residue" not in name and "o_proj" not in name:
+		# 	output = qdq_int
+		# if "embed_tokens" not in name:
+		# 	output = qdq_int
+		# elif "embed_tokens" in name:
+		# 	qdq_int = qdq_group(qdq_int, bits = 16, group_size = 64, offset_enabled = False, is_two_power = True, axis = -1)
+		# 	output = qdq_int
+		# elif "norm" in name:
+		# 	qdq_int = qdq_group(qdq_int, bits = 8, group_size = LANG_HOOK_GROUP_SIZE, offset_enabled = False, is_two_power = False, axis = -1)
+		# 	output = qdq_int
+		elif "qkt" in name:
+			qdq_int = qdq_group(qdq_int, bits = 8, group_size = None, offset_enabled = False, is_two_power = True, axis = -1, is_qkt = True)
+			output = qdq_int
+		elif "v_out" in name:
 			shape = qdq_int.shape
 			qdq_int = qdq_int.reshape(4,-1, 128)
 			t = qdq_int.shape[1]
@@ -167,7 +212,6 @@ class OutputQDQ32_8_Hook_language(object):
 			output = qdq_int
 		else:
 			qdq_int = qdq_group(qdq_int, bits = 8, group_size = LANG_HOOK_GROUP_SIZE, offset_enabled = False, is_two_power = True, axis = -1)
-			# print(f"for module {name}, max diff in qdq is", (output - qdq_int).abs().max())
 			output = qdq_int
 		return output
 
@@ -175,7 +219,7 @@ def add_output_hooks_language(model, scales):
 	output_qdq_hooks = []
 	output_qdq_hook = OutputQDQ32_8_Hook_language()
 	for name, module in model.named_modules():
-		if (isinstance(module, torch.nn.Linear) and ("q_proj" not in name and "k_proj" not in name and "v_proj" not in name and "gate_proj" not in name)) or "q_out" in name or "k_out" in name or "v_out" in name or "sfmx" in name or "attn_output" in name or "act_fn" in name or "eltmul" in name or "norm" in name or "residue" in name:
+		if (isinstance(module, torch.nn.Linear) and ("q_proj" not in name and "k_proj" not in name and "v_proj" not in name and "gate_proj" not in name)) or "q_out" in name or "k_out" in name or "qkt_mask" in name or "v_out" in name or "sfmx" in name or "attn_output" in name or "act_fn" in name or "eltmul" in name or "norm" in name or "residue" in name or "embed_tokens" in name or "smooth_k" in name:
 			output_qdq_hooks.append(
 				module.register_forward_hook(
 					functools.partial(output_qdq_hook, dic = None, name = name)))	

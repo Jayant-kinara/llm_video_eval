@@ -1,4 +1,4 @@
-python3 run_evaluation.py --dataset PerceptionTest --model_path /auto/work/sw/kapil/EfficientQAT/dequantized_real_rotated_2048 --output_path results_output_PerceptionTest_EQAT_2048_visionfull+langfull_64 --samples 1000 --attn_implementation eager --weigths_vision_qdq --hooks_vision_qdq --weights_lang_qdq --hooks_lang_qdq
+python3 run_evaluation.py --dataset MVBench --model_path /auto/work/sw/kapil/EfficientQAT/dequantized_real_rotated_2048 --output_path results_output_PerceptionTest_EQAT_2048_visionfull+langfull_64 --samples 1000 --attn_implementation eager --weights_vision_qdq --hooks_vision_qdq --weights_lang_qdq --hooks_lang_qdq
 
 
 # Video-LLM Accuracy Runner – README  
