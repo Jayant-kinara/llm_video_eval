@@ -191,9 +191,9 @@ class VideoEvaluator:
             try:
                 model_response, duration, fps_used = self.generate(item["video_path"], item["question"], bound=item['bound'], video_type=item.get("video_type", "video"))
                 model_response = self.inferer.postprocess_response(model_response)
-                ollama_output, is_correct = self.evaluate_with_ollama(
-                    item["question"], model_response, item["answer"], options=item.get("options", None)
-                )
+                #ollama_output, is_correct = self.evaluate_with_ollama(
+                #    item["question"], model_response, item["answer"], options=item.get("options", None)
+                #)
                 print("model_response: ", model_response)
                 print("ground_truth: ", item["answer"])
                 soft_score = compute_soft_score(model_response, item["answer"])
@@ -208,9 +208,9 @@ class VideoEvaluator:
                     "question": item["question"],
                     "ground_truth": item["answer"],
                     "prediction": model_response,
-                    "is_correct": is_correct,
+                    #"is_correct": is_correct,
                     "soft_score": soft_score,
-                    "ollma_output": ollama_output,
+                    #"ollma_output": ollama_output,
                     "continued_from": continue_run_folder if continue_run_folder else None
                 }
                 fps_value = str(fps_used)
