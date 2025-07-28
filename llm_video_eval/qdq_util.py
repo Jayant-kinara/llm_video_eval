@@ -1,4 +1,5 @@
 # import pandas as pd
+import numpy as np
 import torch
 import functools
 
@@ -161,29 +162,30 @@ class OutputQDQ32_8_Hook_language(object):
 		# uses_offset = True
 		# print("QDQ LANG HOOK GROUP SIZE :" , LANG_HOOK_GROUP_SIZE)
 
-		if "smooth_k" in name:
-			output = output - output.mean(2).reshape(1,4,1,128)
+		# if "smooth_k" in name:
+		# 	output = output - output.mean(2).reshape(1,4,1,128)
 			# return output
-
+		
+		if "smooth_k" in name and ".0." in name:
+			k_bias = np.fromfile("/auto/regrt/sw/jayant/llm_video_eval/k0_bias.bin", np.float32)
+			k_torch_bias = torch.from_numpy(k_bias)
+			k_torch_bias_gpu = k_torch_bias.to(output.device)
+			k_torch_bias_gpu = k_torch_bias_gpu.to(dtype=torch.bfloat16)
+			output[:,:,:,50:64] = output[:,:,:,50:64] - k_torch_bias_gpu.reshape(1,4,1,128)[:,:,:,50:64]
+			output[:,:,:,114:128] = output[:,:,:,114:128] - k_torch_bias_gpu.reshape(1,4,1,128)[:,:,:,114:128]
+			return output
+		if "smooth_k" in name and ".27." in name:
+			k_bias = np.fromfile("/auto/regrt/sw/jayant/llm_video_eval/k27_bias.bin", np.float32)
+			k_torch_bias = torch.from_numpy(k_bias)
+			k_torch_bias_gpu = k_torch_bias.to(output.device)
+			k_torch_bias_gpu = k_torch_bias_gpu.to(dtype=torch.bfloat16)
+			output[:,:,:,50:64] = output[:,:,:,50:64] - k_torch_bias_gpu.reshape(1,4,1,128)[:,:,:,50:64]
+			output[:,:,:,114:128] = output[:,:,:,114:128] - k_torch_bias_gpu.reshape(1,4,1,128)[:,:,:,114:128]
+			return output
 		qdq_int = qdq(output, int32_scale, 32, True)
-		# output = qdq_int
-		# if "down_proj" not in name and "o_proj" not in name and "residue" not in name and "norm" not in name:
-		# 	output = qdq_int
-		# if "q_out" in name:
-		# 	output = qdq_int
-		if "residue" in name or "norm" in name or "embed_tokens" in name or "k_out" in name:
+		if "k_out" in name and (".0." in name or ".27." in name):
 			qdq_int = qdq_group(qdq_int, bits = 16, group_size = 64, offset_enabled = False, is_two_power = True, axis = -1)
 			output = qdq_int
-		# if "down_proj" not in name and "residue" not in name and "o_proj" not in name:
-		# 	output = qdq_int
-		# if "embed_tokens" not in name:
-		# 	output = qdq_int
-		# elif "embed_tokens" in name:
-		# 	qdq_int = qdq_group(qdq_int, bits = 16, group_size = 64, offset_enabled = False, is_two_power = True, axis = -1)
-		# 	output = qdq_int
-		# elif "norm" in name:
-		# 	qdq_int = qdq_group(qdq_int, bits = 8, group_size = LANG_HOOK_GROUP_SIZE, offset_enabled = False, is_two_power = False, axis = -1)
-		# 	output = qdq_int
 		elif "qkt" in name:
 			qdq_int = qdq_group(qdq_int, bits = 8, group_size = None, offset_enabled = False, is_two_power = True, axis = -1, is_qkt = True)
 			output = qdq_int
@@ -219,7 +221,10 @@ def add_output_hooks_language(model, scales):
 	output_qdq_hooks = []
 	output_qdq_hook = OutputQDQ32_8_Hook_language()
 	for name, module in model.named_modules():
-		if (isinstance(module, torch.nn.Linear) and ("q_proj" not in name and "k_proj" not in name and "v_proj" not in name and "gate_proj" not in name)) or "q_out" in name or "k_out" in name or "qkt_mask" in name or "v_out" in name or "sfmx" in name or "attn_output" in name or "act_fn" in name or "eltmul" in name or "norm" in name or "residue" in name or "embed_tokens" in name or "smooth_k" in name:
+		# if (isinstance(module, torch.nn.Linear) and ("q_proj" not in name and "k_proj" not in name and "v_proj" not in name and "gate_proj" not in name)) or "q_out" in name or "k_out" in name or "qkt_mask" in name or "v_out" in name or "sfmx" in name or "attn_output" in name or "act_fn" in name or "eltmul" in name or "norm" in name or "residue" in name or "embed_tokens" in name or ("smooth_k" in name and (".0." in name or ".27." in name)):
+		# if (isinstance(module, torch.nn.Linear) and ("q_proj" not in name and "k_proj" not in name and "v_proj" not in name and "gate_proj" not in name)) or "q_out" in name or "k_out" in name or "qkt_mask" in name or "v_out" in name or "sfmx" in name or "attn_output" in name or "act_fn" in name or "eltmul" in name or "norm" in name or "residue" in name or "embed_tokens" in name:
+		# if ("smooth_k" in name or "k_out" in name) and (".0." in name or ".27." in name):
+		if ("smooth_k" in name) and (".0." in name or ".27." in name):
 			output_qdq_hooks.append(
 				module.register_forward_hook(
 					functools.partial(output_qdq_hook, dic = None, name = name)))	
@@ -327,6 +332,11 @@ def quantize_model_weights_language(model):
 			# module.weight = torch.nn.Parameter(qdq_group(module.weight,8, None, False))
 			module.weight = torch.nn.Parameter(qdq_group(module.weight,4, 64, True))
 			# qdq_group(tensor: torch.Tensor, bits = 8, group_size = None, offset_enabled = False, is_two_power = False, axis = -1):
+		# if "embed_tokens" in name:
+		# 	with torch.no_grad():
+		# 		module.weight = torch.nn.Parameter(qdq_group(module.weight, bits = 8, group_size = 64, offset_enabled = False, is_two_power = True, axis = -1))
+		# 		# module.weight[:151643,:] = torch.nn.Parameter(qdq_group(module.weight[:151643,:], bits = 8, group_size = 64, offset_enabled = False, is_two_power = True, axis = -1))
+		# 	# breakpoint()
 
 def quantize_model_weights_vision(model):
 	for name,module in model.named_modules():

@@ -11,53 +11,56 @@ import qdq_util
 
 def get_video_duration(video_path):
     vr = decord.VideoReader(video_path)
+    height, width = vr[0].shape[:2]
     num_frames = len(vr)
     fps = vr.get_avg_fps()
     duration = num_frames / fps
-    return duration
+    return duration, height, width
 
 def get_video_duration_torchvision(video_path):
     video, _, info = tvio.read_video(video_path, pts_unit='sec')
+    height, width = video.shape[1:3]
     duration = info['video_duration']
-    return duration
+    return duration, height, width
 
 class Qwen2_5_VL_Inferer:
     def __init__(self, model_id="Qwen/Qwen2.5-VL-7B-Instruct", device="cuda",
                 rotate=False, attn_implementation="sdpa",
                 weights_vision_qdq=False, hooks_vision_qdq=False,
                 weights_lang_qdq=False,hooks_lang_qdq=False,
-                partial_rotate=True):
+                partial_rotate=False):
         print("using attn_implementation: ", attn_implementation)
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model_id,
             device_map="auto",
-            max_memory={
-                0: "3GB",    # allow only 5 GB of model weights on GPU 0
-                1: "22GB",   # allow up to 30 GB on GPU 1
-            },
+            # max_memory={
+            #     0: "3GB",    # allow only 5 GB of model weights on GPU 0
+            #     1: "22GB",   # allow up to 30 GB on GPU 1
+            # },
             torch_dtype=torch.bfloat16,
             trust_remote_code=True,
-            cache_dir="/auto/worka/vpothula/models",
+            # cache_dir="/auto/worka/vpothula/models",
             attn_implementation = attn_implementation
             # attn_implementation = "sdpa"
         )
+        print("Model load done")
 
         if rotate:
             print("QuaRot START")
             rotate_visual_model(self.model)
-            rotate_llm_model(self.model)
+            # rotate_llm_model(self.model)
             print("QuaRot DONE")
-        if partial_rotate:
+        if partial_rotate and (not rotate):
             print("Partial Rotate START")
             partially_rotate_visual_model(self.model)
             print("Partial Rotate DONE")
             
-            # Apply QDQ logic
-            self._apply_vision_qdq(weights_vision_qdq, hooks_vision_qdq)
-            qdq_util.LANG_HOOK_GROUP_SIZE = 64 # configurable
-            self._apply_lang_qdq(weights_lang_qdq, hooks_lang_qdq)
-        else:
-            print("No QDQ chosen. Use --vision_qdq or --lang_qdq with --weights_qdq and/or --hooks_qdq to enable QDQ.")
+        # Apply QDQ logic
+        self._apply_vision_qdq(weights_vision_qdq, hooks_vision_qdq)
+        qdq_util.LANG_HOOK_GROUP_SIZE = 64 # configurable
+        self._apply_lang_qdq(weights_lang_qdq, hooks_lang_qdq)
+        # else:
+        #     print("No QDQ chosen. Use --vision_qdq or --lang_qdq with --weights_qdq and/or --hooks_qdq to enable QDQ.")
 
         MODEL_ID = "Qwen/Qwen2.5-VL-7B-Instruct"
         self.processor = Qwen2_5_VLProcessor.from_pretrained(
@@ -93,10 +96,12 @@ class Qwen2_5_VL_Inferer:
         print(question)
         if dynamic:
             try:
-                duration_sec = get_video_duration(video_path)
+                duration_sec, height_orig, width_orig = get_video_duration(video_path)
+                
             except Exception as e:
                 print(f"[Fallback] Error with decord on {video_path}, using torchvision: {e}")
-                duration_sec = get_video_duration_torchvision(video_path)
+                duration_sec, height_orig, width_orig = get_video_duration_torchvision(video_path)
+
             
             # if duration_sec < 10:
             #     fps = 3.0
@@ -134,23 +139,20 @@ class Qwen2_5_VL_Inferer:
                     {
                         "type": "video",
                         "video": f"file://{video_path}",
-                        "fps": fps,
-                        "resized_height": resized_height,
-                        "resized_width": resized_width,
+                        # "fps": fps,
+                        # "resized_height": resized_height,
+                        # "resized_width": resized_width,
                     },
                     {"type": "text", "text": question}
                 ]
             }
         ]
-
         chat_text = self.processor.apply_chat_template(
             messages,
             tokenize=False,
             add_generation_prompt=True
         )
-
         image_inputs, video_inputs, video_kwargs = process_vision_info(messages, return_video_kwargs=True)
-
         model_inputs = self.processor(
             text=[chat_text],
             videos=video_inputs,
@@ -170,7 +172,7 @@ class Qwen2_5_VL_Inferer:
         response = self.processor.batch_decode(output_ids, skip_special_tokens=True)[0]
         return response, duration_sec, fps
 
-    def infer_frames(self, frame_folder, question, dataset, max_new_tokens=512, num_frames=32, bound=None, fps=3):
+    def infer_frames(self, frame_folder, question, dataset, max_new_tokens=512, num_frames=32, bound=None, fps=3, resized_height=12*28, resized_width=12*28):
         # All frame files
         frame_files = sorted([
             os.path.join(frame_folder, f)
@@ -217,7 +219,9 @@ class Qwen2_5_VL_Inferer:
                 "content": [
                     {
                         "type": "video",
-                        "video": frame_uris
+                        "video": frame_uris,
+                        # "resized_height": resized_height,
+                        # "resized_width": resized_width,
                     },
                     {"type": "text", "text": question}
                 ]
@@ -231,7 +235,6 @@ class Qwen2_5_VL_Inferer:
         )
 
         image_inputs, video_inputs, video_kwargs = process_vision_info(messages, return_video_kwargs=True)
-
         model_inputs = self.processor(
             text=[chat_text],
             videos=video_inputs,
